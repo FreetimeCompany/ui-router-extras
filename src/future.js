@@ -122,6 +122,9 @@
     }
 
     function lazyLoadState($injector, futureState) {
+      if (!lazyloadInProgress && statesAddedQueue) {
+        statesAddedQueue.$rootScope.$broadcast("$lazyLoadStateStart", futureState);
+      }
       lazyloadInProgress = true;
       var $q = $injector.get("$q");
       if (!futureState) {
@@ -308,7 +311,7 @@
   }]);
 
   // inject $futureState so the service gets initialized via $get();
-  app.run(['$futureState', function ($futureState, $rootScope) {
+  app.run(['$futureState', '$rootScope', function ($futureState, $rootScope) {
     statesAddedQueue.itsNowRuntimeOhWhatAHappyDay($rootScope);
   } ]);
 
