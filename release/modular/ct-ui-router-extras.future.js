@@ -131,9 +131,7 @@
     }
 
     function lazyLoadState($injector, futureState) {
-      if (!lazyloadInProgress && statesAddedQueue) {
-        statesAddedQueue.$rootScope.$broadcast("$lazyLoadStateStart", futureState);
-      }
+      var _lazyloadInProgress = lazyloadInProgress;
       lazyloadInProgress = true;
       var $q = $injector.get("$q");
       if (!futureState) {
@@ -142,9 +140,12 @@
         return deferred.promise;
       }
 
-      var parentPromises = $q.when([]), parentFuture = futureState.parentFutureState;
+      var parentPromises = [], parentFuture = futureState.parentFutureState;
       if (parentFuture && futureStates[parentFuture.name]) {
-        parentPromises = lazyLoadState($injector, futureStates[parentFuture.name]);
+        parentPromises.push(lazyLoadState($injector, futureStates[parentFuture.name]));
+      }
+      if (!_lazyloadInProgress && statesAddedQueue) {
+        statesAddedQueue.$rootScope.$broadcast("$lazyLoadStateStart", futureState, parentPromises);
       }
 
       var type = futureState.type;
@@ -158,7 +159,7 @@
         return $q.reject(err);
       }
 
-      return parentPromises.then(function(array) {
+      return $q.all(parentPromises).then(function(array) {
         var factoryPromise = $injector.invoke(factory, factory, { futureState: futureState });
 
         return factoryPromise.then(function(fullState) {
@@ -196,11 +197,7 @@
             }
 
             // Config loaded.  Asynchronously lazy-load state definition from URL fragment, if mapped.
-            lazyLoadState($injector, futureState).then(function lazyLoadedStateCallback(states) {
-              states.forEach(function (state) {
-                if (state && (!$state.get(state) || (state.name && !$state.get(state.name))))
-                  $stateProvider.state(state);
-              });
+            lazyLoadState($injector, futureState).then(function lazyLoadedStateCallback() {
               lazyloadInProgress = false;
               resync();
             }, function lazyLoadStateAborted() {
